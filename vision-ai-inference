@@ -1,1 +1,18 @@
+import requests
+from requets.auth import HTTPBasicAuth
 
+URL = ""
+ACCESS_KEY = ""
+
+IMAGE_FILE_PATH = ""
+
+image = open(IMAGE_FILE_PATH, "rb").read()
+
+response = requests.post(
+    url=URL,
+    auth=HTTPBasicAuth("solutions-eng", ACCESS_KEY),
+    headers={"Content-Type": "image/jpeg"},
+    data=image,
+)
+
+print(response.json())
