@@ -1,0 +1,92 @@
+# YouTube에서 동영상을 다운로드하고 프레임 단위로 분리, 각 프레임에 YOLO 객체 탐지를 수행하여 결과 이미지를 저장, 결과 이미지를 다시 시퀀스화하여 새 동영상으로 생성
+
+# 라이브러리 임포트
+import os  # 파일 및 디렉토리 관련 작업을 수행하기 위한 라이브러리
+import yt_dlp  # YouTube 동영상을 다운로드하는 라이브러리
+import cv2  # OpenCV : 영상 및 이미지 처리에 사용하는 라이브러리
+from ultralytics import YOLO  # YOLO 객체 탐지 모델을 제공하는 라이브러리
+from moviepy.editor import ImageSequenceClip  # 이미지 시퀀스를 동영상으로 변환하는 데 사용
+
+## YouTube 영상 다운로드
+# YouTube 동영상 다운로드 설정
+url = ""  # 다운로드할 YouTube 동영상 URL
+# yt-dlp 설정
+ydl_opts = {
+    "format": "best",  # format 옵션은 최고 화질로 다운로드 지정
+    "outtmpl": "downloaded_video.%(ext)s",  # outtmpl 옵션은 파일 이름 형식을 지정
+}
+# YouTube 동영상 다운로드
+with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # 지정한 옵션으로 yt-dlp를 설정
+    ydl.download([url])  # 이걸 통해 동영상을 다운로드 
+
+## 동영상의 fps 정보
+# 동영상 파일 경로
+video_path = "downloaded_video.mp4"  # 다운로드된 파일은 "downloaded_video.mp4"로 저장
+# 동영상 파일 열기
+cap = cv2.VideoCapture(video_path)  # OpenCV를 이용해 동영상 파일을 열고 FPS를 가져옴
+# FPS 가져오기
+fps = cap.get(cv2.CAP_PROP_FPS)  # 동영상의 FPS 값을 가져옴
+print("FPS:", fps)
+# 동영상 파일 닫기
+cap.release()  # 동영상 파일을 닫아 자원을 해제
+
+## 동영상을 프레임 단위로 분할
+video_path = "downloaded_video.mp4"
+# cv2를 이용해 동영상 파일 열기
+cap = cv2.VideoCapture(video_path)
+# 프레임을 저장할 디렉토리 생성
+output_dir = "frames"  # 프레임을 저장할 디렉토리 이름을 설정
+os.makedirs(output_dir, exist_ok=True)  # 디렉토리를 생성, 이미 존재할 경우 오류없이 넘김
+# 프레임 단위로 이미지로 저장
+frame_count = 0
+while cap.isOpened():  # 동영상이 열려 있는 동안 반복
+    ret, frame = cap.read()  # 현재 프레임을 읽음, ret : 프레임을 성공적으로 읽었는지 나타내는 불리언 값
+    if not ret:
+        break
+    # 이미지 파일로 프레임 저장
+    frame_path = os.path.join(output_dir, f"frame_{frame_count:04d}.jpg")
+    cv2.imwrite(frame_path, frame)  # 프레임을 JPEG 형식으로 frames 디렉토리에 저장
+    frame_count += 1  # 저장된 프레임 수를 증가시킴
+# 동영상 파일 닫기
+cap.release()
+print(f"총 {frame_count}개의 프레임이 저장되었습니다.")
+
+## YOLOv8 추론
+# Load a model
+model = YOLO("yolov8n.pt")  # YOLOv8 모델을 로드
+# "frames" 디렉토리 안에 있는 파일과 폴더 목록을 가져옴
+frames = os.listdir("frames/")  # frames 디렉토리의 모든 파일을 리스트로 가져옴
+# 원하는 디렉토리 경로 설정
+directory_path = "results"  # YOLO 탐지 결과를 저장할 디렉토리
+# 디렉토리가 없으면 생성
+if not os.path.exists(directory_path):
+    os.makedirs(directory_path)
+    print(f"디렉토리 '{directory_path}'가 생성되었어.")
+else:
+    print(f"디렉토리 '{directory_path}'가 이미 존재해.")
+
+for frame in frames:
+    # YOLOv8 모델을 사용하여 객체 감지 수행
+    results = model("frames/" + frame)  # , device="mps" (맥북)
+
+    # Process results list
+    for result in results:
+        result.save(filename="results/" + frame)  # save to disk
+
+## 프레임을 동영상으로 변환 - moviepy라이브러리
+# 이미지 파일들이 저장된 디렉토리 경로
+image_folder = "results"  # YOLO 탐지 결과가 저장된 디렉토리
+fps = int(fps)  # 초당 프레임 수 설정
+# 이미지 파일 리스트 가져오기 (예: jpg, png 형식)
+image_files = [
+    os.path.join(image_folder, img)
+    for img in sorted(os.listdir(image_folder))
+    if img.endswith((".jpg", ".png"))
+]
+# 이미지 시퀀스를 이용해 클립 생성
+clip = ImageSequenceClip(image_files, fps=fps)
+# 동영상 파일로 저장
+output_path = "output_video.mp4"
+clip.write_videofile(output_path, codec="libx264")
+
+print(f"동영상이 생성되었습니다: {output_path}")
