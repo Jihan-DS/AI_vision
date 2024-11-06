@@ -1,0 +1,48 @@
+# YOLOv8 객체 탐지 모델을 이용해 이미지를 분석하고, 그 결과를 Gradio 인터페이스로 시각화하는 웹 애플리케이션
+
+# 라이브러리 임포트
+import cv2  # OpenCV : 이미지 처리에 널리 사용되는 라이브러리, 색상 변환, 이미지 인코딩 등 이미지 작업에 사용
+import gradio as gr  # gradio : 머신러닝 애플리케이션을 쉽게 웹 인터페이스로 배보할 수 있는 라이브러리
+import numpy as np  # numpy : 수학 연산 및 배열을 다루는 라이브러리, 이미지 데이터를 행렬 형태로 변환할 때 사용
+from PIL import Image  # 이미지를 다루기 위한 라이브러리, OpenCV와 Gradio 간의 이미지 형식을 변환할 때 사용
+from requests.auth import HTTPBasicAuth  # HTTP 인증을 위한 라이브러리, 사용자는 API에 인증을 통해 접근 가능
+from ultralytics import YOLO  # YOLO 모델을 제공하는 ultralytics 패키지, 객체 탐지 모델 YOLOv8을 사용해 이미지 내 객체를 탐지 가능
+
+# YOLO 모델 로드
+model = YOLO("yolov8l.pt")  # YOLO 모델을 로드하는 부분, "yolov8l.pt"는 사전 학습된 YOLOv8 모델 파일
+
+# API URL 및 인증 설정
+VISION_API_URL = ""  # 이미지 또는 비디오를 API 서버에 전송하기 위한 URL을 저장하는 변수
+TEAM = ""  # 팀명이나 API 호출에 필요한 인증 정보로 사용
+ACCESS_KEY = ""  # API 접근을 위한 인증 키
+
+# 이미지 처리 함수 정의
+def process_image(image):  # process_image : Gradio 인터페이스에서 이미지를 입력으로 받아 YOLO 객체 탐지 모델을 통해 처리
+    # 이미지를 OpenCV 형식으로 변환
+    image = np.array(image)  # 입력 이미지를 NumPy 배열 형식으로 변환
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)  # 색상 공간을 RGB -> BGR로 변환, OpenCV는 BGR 색상 체계가 기본, YOLO모델은 RGB
+
+    #이미지 인코딩
+    _, img_encoded = cv2.imencode(".jpg", image)  # 이미지 -> JPEG 형식으로 인코딩, imencode : 이미지 파일을 네트워크 전송 형식으로 변환할 때 사용
+
+    # API 호출 및 결과 받기(YOLO 모델로 객체 탐지 수행)
+    results = model(image)  # YOLO 모델을 사용하여 이미지에서 객체 탐지를 수행, results : 탐지된 객체 정보(좌표, 클래스, 신뢰도 등)가 포함
+
+    # API 결과를 바탕으로 박스 그리기
+    image = results[0].plot()  # 탐지 결과를 바탕으로 이미지에 박스를 그림, results[0].plot() : 결과 객체에 대한 이미지로 객체 박스가 포함된 이미지를 변환
+
+    # BGR 이미지를 RGB로 변환 후 반환
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # 탐지 박스를 그린 이미지를 다시 RGB 형식으로 변환
+    return Image.fromarray(image)  # Image.fromarray() : 이미지를 PIL 형식으로 변환하여 반환, Gradio가 결과 이미지를 표시하는 데 필요한 형식
+
+# Gradio 인터페이스 설정
+iface = gr.Interface(  # Gradio 인터페이스를 생성하는 구문, 이미지 파일을 입력받고, 객체 탐지 결과를 출력으로 반환
+    fn=process_image,  # 이미지 처리 함수를 지정
+    inputs=gr.Image(type="pil"),  # 사용자 입력으로 이미지를 받으며, 형식은 PIL 이미지
+    outputs="image",  # 결과가 이미지 형태로 반환
+    title="Vision AI Object Detection",
+    description="Upload an image to detect objects using Vision AI.",  # Gradio 인터페이스의 제목과 설명을 설정하여 사용자 경험을 개선
+)
+
+# 인터페이스 실행
+iface.launch(share = True)  # Gradio 인터페이스를 실행, share = True : Gradio가 웹 링크를 생성하여 외부에서 접근 가능하게 만듬
