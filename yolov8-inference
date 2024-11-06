@@ -1,0 +1,21 @@
+# YOLOv8 모델을 사용하여 이미지 내 객체를 탐지하고, 객체의 위치와 클래스, 키포인트, 분할 마스크 등을 포함한 세부 정보를 추출하여 표시 및 저장
+
+# 라이브러리 임포트
+from ultralytics import YOLO  # ultralytics 라이브러리에서 YOLO 클래스만 임포트
+
+# YOLO 모델 로드
+model = YOLO("yolov8l.pt")  # COCO 데이터셋으로 사전 학습된 YOLOv8 모델 로드, "yolov8l.pt"는 YOLOv8의 'large'모델 파일로 다양한 객체에 대해 높은 정화도 제공
+
+# YOLO 모델을 사용하여 이미지에서 추론 수행
+results = model("sample.jpg")  # "sample.jpg"라는 이미지 파일에 대해 객체 탐지 모델을 사용하여 추론 수행, 결과는 results라는 리스트를 반환, 각 result는 이미지에서 탐지된 객체들에 대한 정보를 포함
+
+# 결과 처리 및 각 속성 추출
+for result in results:  # results 리스트의 각 result 객체에 대한 반복문 돌림, result는 한 이미지 내에서 탐지된 객체와 관련된 정보를 포함
+    boxes = result.boxes  # 탐지된 객체의 Bounding boxes 추출, 탐지된 객체의 좌표, 크기, 신뢰도 등을 포함하며 이미지 내 특정 객체의 위치를 나타냄
+    masks = result.masks  # 탐지된 객체의 분할 마스크 정보를 가져옴, 분할 마스크는 각 객체의 윤곽을 정확하게 나타내며, 객체의 모양을 표현하는데 사용
+    keypoints = result.keypoints  # 탐지된 객체의 키포인트 정보를 제공, 포즈 추정에 사용되며 사람의 신체 관절 위치 등을 나타내는데 사용
+    probs = result.probs  # 분류(Classification) 결과에서 각 객체가 특정 클래스일 확률을 제공
+    obb = result.obb  # 방향 경계 상자(OBB) 정보를 가져옴, 객체의 방향을 고려하여 경계 상자를 기울어진 형태로 나타냄
+    # 결과 표시 및 저장
+    result.show()  # 추론 결과가 표시된 이미지를 화면에 표시
+    result.save(filename="result.jpg")  # 결과 이미지를 파일로 저장, 파일명 : "result.jpg"
